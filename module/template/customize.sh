@@ -70,20 +70,15 @@ extract "$ZIPFILE" 'sepolicy.rule'   "$MODPATH"
 extract "$ZIPFILE" 'daemon'          "$MODPATH"
 chmod 755 "$MODPATH/daemon"
 
-mkdir "$MODPATH/zygisk"
 
 if [ "$ARCH" = "x64" ]; then
   ui_print "- Extracting x64 libraries"
   extract "$ZIPFILE" "lib/x86_64/lib$SONAME.so" "$MODPATH" true
   extract "$ZIPFILE" "lib/x86_64/libinject.so" "$MODPATH" true
-  extract "$ZIPFILE" "lib/x86_64/libtszygisk.so" "$MODPATH/zygisk" true
-  mv "$MODPATH/zygisk/libtszygisk.so" "$MODPATH/zygisk/x86_64.so"
 else
   ui_print "- Extracting arm64 libraries"
   extract "$ZIPFILE" "lib/arm64-v8a/lib$SONAME.so" "$MODPATH" true
   extract "$ZIPFILE" "lib/arm64-v8a/libinject.so" "$MODPATH" true
-  extract "$ZIPFILE" "lib/arm64-v8a/libtszygisk.so" "$MODPATH/zygisk" true
-  mv "$MODPATH/zygisk/libtszygisk.so" "$MODPATH/zygisk/arm64-v8a.so"
 fi
 
 mv "$MODPATH/libinject.so" "$MODPATH/inject"
