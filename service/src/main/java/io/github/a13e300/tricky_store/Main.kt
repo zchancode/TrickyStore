@@ -3,14 +3,22 @@ package io.github.a13e300.tricky_store
 import java.io.File
 import java.security.MessageDigest
 import kotlin.system.exitProcess
+import android.os.Build
 
 fun main(args: Array<String>) {
     verifySelf()
     Logger.i("Welcome to TrickyStore!")
     while (true) {
-        if (!KeystoreInterceptor.tryRunKeystoreInterceptor()) {
-            Thread.sleep(1000)
-            continue
+        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q || Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
+            if (!Keystore1Interceptor.tryRunKeystoreInterceptor()) {
+                Thread.sleep(1000)
+                continue
+            }
+        } else {
+            if (!KeystoreInterceptor.tryRunKeystoreInterceptor()) {
+                Thread.sleep(1000)
+                continue
+            }
         }
         Config.initialize()
         while (true) {
@@ -43,8 +51,8 @@ fun verifySelf() {
             Logger.e("unverified module files! ($checksum != ${BuildConfig.CHECKSUM})")
             prop.writeText(kv.entries.joinToString("\n") { (k, v) ->
                 when (k) {
-                    "description" -> "description=×Module files corrupted, please re-download it from github.com/5ec1cff/TrickyStore"
-                    "author" -> "author=5ec1cff"
+                    "description" -> "description=×Module files corrupted, please re-download it from github.com/qwq233/TrickyStore"
+                    "author" -> "author=5ec1cff, James Clef"
                     else -> "$k=$v"
                 }
             })

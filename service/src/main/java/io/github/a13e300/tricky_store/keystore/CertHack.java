@@ -70,6 +70,7 @@ import javax.security.auth.x500.X500Principal;
 
 import io.github.a13e300.tricky_store.Config;
 import io.github.a13e300.tricky_store.Logger;
+import io.github.a13e300.tricky_store.SecurityLevelInterceptor;
 import io.github.a13e300.tricky_store.UtilKt;
 
 public final class CertHack {
@@ -78,9 +79,12 @@ public final class CertHack {
     private static final int ATTESTATION_APPLICATION_ID_PACKAGE_INFOS_INDEX = 0;
     private static final int ATTESTATION_APPLICATION_ID_SIGNATURE_DIGESTS_INDEX = 1;
     private static final Map<String, KeyBox> keyboxes = new HashMap<>();
+    private static final Map<Key, String> leafAlgorithm = new HashMap<>();
     private static final int ATTESTATION_PACKAGE_INFO_PACKAGE_NAME_INDEX = 0;
 
     private static final CertificateFactory certificateFactory;
+
+    public record Key(String alias, int uid) {}
 
     static {
         try {
@@ -251,9 +255,189 @@ public final class CertHack {
         }
         return caList;
     }
+    public static byte[] hackCertificateChainCA(byte[] caList, String alias, int uid) {
+        if (caList == null) throw new UnsupportedOperationException("caList is null!");
+        try {
+            var key = new Key(alias, uid);
+            var algorithm = leafAlgorithm.get(key);
+            leafAlgorithm.remove(key);
+            var k = keyboxes.get(algorithm);
+            if (k == null)
+                throw new UnsupportedOperationException("unsupported algorithm " + algorithm);
+            return Utils.toBytes(k.certificates);
+        } catch (Throwable t) {
+            Logger.e("", t);
+        }
+        return caList;
+    }
+    public static byte[] hackCertificateChainUSR(byte[] certificate, String alias, int uid) {
+        if (certificate == null) throw new UnsupportedOperationException("leaf is null!");
+        try {
+            X509Certificate leaf = (X509Certificate) certificateFactory.generateCertificate(new ByteArrayInputStream(certificate));
+            byte[] bytes = leaf.getExtensionValue(OID.getId());
+            if (bytes == null) return certificate;
 
-    public static Pair<KeyPair, List<Certificate>> generateKeyPair(int uid, KeyDescriptor descriptor, KeyGenParameters params) {
+            X509CertificateHolder leafHolder = new X509CertificateHolder(leaf.getEncoded());
+            Extension ext = leafHolder.getExtension(OID);
+            ASN1Sequence sequence = ASN1Sequence.getInstance(ext.getExtnValue().getOctets());
+            ASN1Encodable[] encodables = sequence.toArray();
+            ASN1Sequence teeEnforced = (ASN1Sequence) encodables[7];
+            ASN1EncodableVector vector = new ASN1EncodableVector();
+            ASN1Encodable rootOfTrust = null;
+
+            for (ASN1Encodable asn1Encodable : teeEnforced) {
+                ASN1TaggedObject taggedObject = (ASN1TaggedObject) asn1Encodable;
+                if (taggedObject.getTagNo() == 704) {
+                    rootOfTrust = taggedObject.getBaseObject().toASN1Primitive();
+                    continue;
+                }
+                vector.add(taggedObject);
+            }
+
+            LinkedList<Certificate> certificates;
+            X509v3CertificateBuilder builder;
+            ContentSigner signer;
+
+            leafAlgorithm.put(new Key(alias, uid), leaf.getPublicKey().getAlgorithm());
+            var k = keyboxes.get(leaf.getPublicKey().getAlgorithm());
+            if (k == null)
+                throw new UnsupportedOperationException("unsupported algorithm " + leaf.getPublicKey().getAlgorithm());
+            certificates = new LinkedList<>(k.certificates);
+            builder = new X509v3CertificateBuilder(
+                    new X509CertificateHolder(
+                            certificates.get(0).getEncoded()
+                    ).getSubject(),
+                    leafHolder.getSerialNumber(),
+                    leafHolder.getNotBefore(),
+                    leafHolder.getNotAfter(),
+                    leafHolder.getSubject(),
+                    leafHolder.getSubjectPublicKeyInfo()
+            );
+            signer = new JcaContentSignerBuilder(leaf.getSigAlgName())
+                    .build(k.keyPair.getPrivate());
+
+            byte[] verifiedBootKey = UtilKt.getBootKey();
+            byte[] verifiedBootHash = null;
+            try {
+                if (!(rootOfTrust instanceof ASN1Sequence r)) {
+                    throw new CertificateParsingException("Expected sequence for root of trust, found "
+                            + rootOfTrust.getClass().getName());
+                }
+                verifiedBootHash = getByteArrayFromAsn1(r.getObjectAt(3));
+            } catch (Throwable t) {
+                Logger.e("failed to get verified boot key or hash from original, use randomly generated instead", t);
+            }
+
+            if (verifiedBootHash == null) {
+                verifiedBootHash = UtilKt.getBootHash();
+            }
+
+            ASN1Encodable[] rootOfTrustEnc = {
+                    new DEROctetString(verifiedBootKey),
+                    ASN1Boolean.TRUE,
+                    new ASN1Enumerated(0),
+                    new DEROctetString(verifiedBootHash)
+            };
+
+            ASN1Sequence hackedRootOfTrust = new DERSequence(rootOfTrustEnc);
+            ASN1TaggedObject rootOfTrustTagObj = new DERTaggedObject(704, hackedRootOfTrust);
+            vector.add(rootOfTrustTagObj);
+
+            ASN1Sequence hackEnforced = new DERSequence(vector);
+            encodables[7] = hackEnforced;
+            ASN1Sequence hackedSeq = new DERSequence(encodables);
+
+            ASN1OctetString hackedSeqOctets = new DEROctetString(hackedSeq);
+            Extension hackedExt = new Extension(OID, false, hackedSeqOctets);
+            builder.addExtension(hackedExt);
+
+            for (ASN1ObjectIdentifier extensionOID : leafHolder.getExtensions().getExtensionOIDs()) {
+                if (OID.getId().equals(extensionOID.getId())) continue;
+                builder.addExtension(leafHolder.getExtension(extensionOID));
+            }
+            return new JcaX509CertificateConverter().getCertificate(builder.build(signer)).getEncoded();
+
+        } catch (Throwable t) {
+            Logger.e("", t);
+        }
+        return certificate;
+    }
+
+    public static KeyPair generateKeyPair(KeyGenParameters params){
+        KeyPair kp;
+        try {
+            var algo = params.algorithm;
+            if (algo == Algorithm.EC) {
+                Logger.d("GENERATING EC KEYPAIR OF SIZE " + params.keySize);
+                kp = buildECKeyPair(params);
+            } else if (algo == Algorithm.RSA) {
+                Logger.d("GENERATING RSA KEYPAIR OF SIZE " + params.keySize);
+                kp = buildRSAKeyPair(params);
+            } else {
+                Logger.e("UNSUPPORTED ALGORITHM: " + algo);
+                return null;
+            }
+            return kp;
+        } catch (Throwable t) {
+            Logger.e("", t);
+        }
+        return null;
+    }
+    public static List<byte[]> generateChain(int uid, KeyGenParameters params, KeyPair kp){
+        KeyPair rootKP;
+        X500Name issuer;
+        KeyBox keyBox = null;
+        try{
+            var algo = params.algorithm;
+            if (algo == Algorithm.EC) {
+                keyBox = keyboxes.get(KeyProperties.KEY_ALGORITHM_EC);
+            } else if (algo == Algorithm.RSA) {
+                keyBox = keyboxes.get(KeyProperties.KEY_ALGORITHM_RSA);
+            }
+            if (keyBox == null) {
+                Logger.e("UNSUPPORTED ALGORITHM: " + algo);
+                return null;
+            }
+            rootKP = keyBox.keyPair;
+            issuer = new X509CertificateHolder(
+                    keyBox.certificates.get(0).getEncoded()
+            ).getSubject();
+
+            X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(issuer,
+                    new BigInteger("1"),//params.certificateSerial,
+                    params.certificateNotBefore,
+                    ((X509Certificate)keyBox.certificates.get(0)).getNotAfter(),//params.certificateNotAfter,
+                    new X500Name("CN=Android KeyStore Key"),//params.certificateSubject,
+                    kp.getPublic()
+            );
+
+            KeyUsage keyUsage = new KeyUsage(KeyUsage.keyCertSign);
+            certBuilder.addExtension(Extension.keyUsage, true, keyUsage);
+            certBuilder.addExtension(createExtension(params, uid));
+
+            ContentSigner contentSigner;
+            if (algo == Algorithm.EC) {
+                contentSigner = new JcaContentSignerBuilder("SHA256withECDSA").build(rootKP.getPrivate());
+            } else {
+                contentSigner = new JcaContentSignerBuilder("SHA256withRSA").build(rootKP.getPrivate());
+            }
+            X509CertificateHolder certHolder = certBuilder.build(contentSigner);
+            var leaf = new JcaX509CertificateConverter().getCertificate(certHolder);
+            List<Certificate> chain = new ArrayList<>(keyBox.certificates);
+            chain.add(0, leaf);
+            //Logger.d("Successfully generated X500 Cert for alias: " + descriptor.alias);
+            return Utils.toListBytes(chain);
+        } catch (Throwable t) {
+            Logger.e("", t);
+        }
+        return null;
+    }
+
+    public static Pair<KeyPair, List<Certificate>> generateKeyPair(int uid, KeyDescriptor descriptor, KeyDescriptor attestKeyDescriptor, KeyGenParameters params) {
         Logger.i("Requested KeyPair with alias: " + descriptor.alias);
+        boolean attestPurpose = attestKeyDescriptor != null;
+        if (attestPurpose)
+            Logger.i("Requested KeyPair with attestKey: " + attestKeyDescriptor.alias);
         KeyPair rootKP;
         X500Name issuer;
         int size = params.keySize;
@@ -279,6 +463,17 @@ public final class CertHack {
                     keyBox.certificates.get(0).getEncoded()
             ).getSubject();
 
+            if (attestPurpose) {
+                var info = SecurityLevelInterceptor.Companion.getKeyPairs(uid, attestKeyDescriptor.alias);
+                if (info != null) {
+                    rootKP = info.getFirst();
+                    issuer = new X509CertificateHolder(
+                            info.getSecond().get(0).getEncoded()
+                    ).getSubject();
+                }
+            }
+
+            Logger.d("certificateSubject: " + params.certificateSubject);
             X509v3CertificateBuilder certBuilder = new JcaX509v3CertificateBuilder(issuer,
                     params.certificateSerial,
                     params.certificateNotBefore,
@@ -299,7 +494,12 @@ public final class CertHack {
             }
             X509CertificateHolder certHolder = certBuilder.build(contentSigner);
             var leaf = new JcaX509CertificateConverter().getCertificate(certHolder);
-            List<Certificate> chain = new ArrayList<>(keyBox.certificates);
+            List<Certificate> chain;
+            if (!attestPurpose) {
+                chain = new ArrayList<>(keyBox.certificates);
+            } else {
+                chain = new ArrayList<>();
+            }
             chain.add(0, leaf);
             Logger.d("Successfully generated X500 Cert for alias: " + descriptor.alias);
             return new Pair<>(kp, chain);
@@ -345,6 +545,8 @@ public final class CertHack {
                     new ASN1Enumerated(0), new DEROctetString(hash)};
 
             ASN1Sequence rootOfTrustSeq = new DERSequence(rootOfTrustEncodables);
+
+            Logger.dd("params.purpose: " + params.purpose);
 
             var Apurpose = new DERSet(fromIntList(params.purpose));
             var Aalgorithm = new ASN1Integer(params.algorithm);
@@ -510,7 +712,8 @@ public final class CertHack {
         public byte[] manufacturer;
         public byte[] model;
 
-        public KeyGenParameters(KeyParameter[] params) {
+        public KeyGenParameters(){}
+        public KeyGenParameters(KeyParameter[] params, boolean isAttestKey) {
             for (var kp : params) {
                 var p = kp.value;
                 switch (kp.tag) {
@@ -529,6 +732,10 @@ public final class CertHack {
                         ecCurveName = getEcCurveName(ecCurve);
                     }
                     case Tag.PURPOSE -> {
+                        if (isAttestKey) {
+                            purpose.add(7);
+                            continue;
+                        }
                         purpose.add(p.getKeyPurpose());
                     }
                     case Tag.DIGEST -> {
@@ -555,6 +762,14 @@ public final class CertHack {
                 default -> throw new IllegalArgumentException("unknown curve");
             }
             return res;
+        }
+        public void setEcCurveName(int curve) {
+            switch (curve) {
+                case 224 -> this.ecCurveName = "secp224r1";
+                case 256 -> this.ecCurveName = "secp256r1";
+                case 384 -> this.ecCurveName = "secp384r1";
+                case 521 -> this.ecCurveName = "secp521r1";
+            }
         }
     }
 }

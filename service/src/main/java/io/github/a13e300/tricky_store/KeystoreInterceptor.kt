@@ -17,6 +17,8 @@ import kotlin.system.exitProcess
 object KeystoreInterceptor : BinderInterceptor() {
     private val getKeyEntryTransaction =
         getTransactCode(IKeystoreService.Stub::class.java, "getKeyEntry") // 2
+    private val deleteKeyTransaction =
+        getTransactCode(IKeystoreService.Stub::class.java, "deleteKey")
 
     private lateinit var keystore: IBinder
 
@@ -65,26 +67,39 @@ object KeystoreInterceptor : BinderInterceptor() {
         reply: Parcel?,
         resultCode: Int
     ): Result {
-        if (target != keystore || code != getKeyEntryTransaction || reply == null) return Skip
+        if (target != keystore || reply == null) return Skip
         if (kotlin.runCatching { reply.readException() }.exceptionOrNull() != null) return Skip
         val p = Parcel.obtain()
         Logger.d("intercept post $target uid=$callingUid pid=$callingPid dataSz=${data.dataSize()} replySz=${reply.dataSize()}")
-        try {
-            val response = reply.readTypedObject(KeyEntryResponse.CREATOR)
-            val chain = Utils.getCertificateChain(response)
-            if (chain != null) {
-                val newChain = CertHack.hackCertificateChain(chain)
-                Utils.putCertificateChain(response, newChain)
-                Logger.i("hacked cert of uid=$callingUid")
-                p.writeNoException()
-                p.writeTypedObject(response, 0)
-                return OverrideReply(0, p)
-            } else {
+
+        if (code == deleteKeyTransaction && resultCode == 0) {
+            data.enforceInterface("android.system.keystore2.IKeystoreService")
+
+            val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
+            if (keyDescriptor == null || keyDescriptor.domain == 0) return Skip
+
+            SecurityLevelInterceptor.keys.remove(SecurityLevelInterceptor.Key(callingUid, keyDescriptor.alias))
+
+            return Skip
+        } else if (code == getKeyEntryTransaction) {
+            try {
+                data.enforceInterface("android.system.keystore2.IKeystoreService")
+                val response = reply.readTypedObject(KeyEntryResponse.CREATOR)
+                val chain = Utils.getCertificateChain(response)
+                if (chain != null) {
+                    val newChain = CertHack.hackCertificateChain(chain)
+                    Utils.putCertificateChain(response, newChain)
+                    Logger.i("hacked cert of uid=$callingUid")
+                    p.writeNoException()
+                    p.writeTypedObject(response, 0)
+                    return OverrideReply(0, p)
+                } else {
+                    p.recycle()
+                }
+            } catch (t: Throwable) {
+                Logger.e("failed to hack certificate chain of uid=$callingUid pid=$callingPid!", t)
                 p.recycle()
             }
-        } catch (t: Throwable) {
-            Logger.e("failed to hack certificate chain of uid=$callingUid pid=$callingPid!", t)
-            p.recycle()
         }
         return Skip
     }

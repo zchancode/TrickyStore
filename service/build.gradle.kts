@@ -30,7 +30,7 @@ fun calculateChecksum(variantLowered: String): String {
 
 android {
     namespace = "io.github.a13e300.tricky_store"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "io.github.a13e300.tricky_store"

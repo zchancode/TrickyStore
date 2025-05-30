@@ -1,6 +1,10 @@
-# Tricky Store
+# Tricky Store (Fork)
 
 A trick of keystore. **Android 12 or above is required**.
+
+## Feature
+
+- FOSS
 
 ## Usage
 

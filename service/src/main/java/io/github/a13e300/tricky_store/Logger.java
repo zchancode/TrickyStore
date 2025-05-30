@@ -8,12 +8,16 @@ public class Logger {
         Log.d(TAG, msg);
     }
 
+    public static void dd(String msg) {
+        d("wtf: " + msg);
+    }
+
     public static void e(String msg) {
         Log.e(TAG, msg);
     }
 
     public static void e(String msg, Throwable t) {
-        Log.e(TAG, msg, t);
+        Log.e(TAG, "wtf: " + msg, t);
     }
 
     public static void i(String msg) {

@@ -13,6 +13,7 @@ object Config {
     private fun updateTargetPackages(f: File?) = runCatching {
         hackPackages.clear()
         generatePackages.clear()
+        listOf("com.google.android.gsf", "com.google.android.gms", "com.android.vending").forEach { generatePackages.add(it) }
         f?.readLines()?.forEach {
             if (it.isNotBlank() && !it.startsWith("#")) {
                 val n = it.trim()
@@ -78,14 +79,12 @@ object Config {
     }
 
     fun needHack(callingUid: Int) = kotlin.runCatching {
-        if (hackPackages.isEmpty()) return false
-        val ps = getPm()?.getPackagesForUid(callingUid)
-        ps?.any { it in hackPackages }
+        false
     }.onFailure { Logger.e("failed to get packages", it) }.getOrNull() ?: false
 
     fun needGenerate(callingUid: Int) = kotlin.runCatching {
-        if (generatePackages.isEmpty()) return false
+        if (generatePackages.isEmpty() && hackPackages.isEmpty()) return false
         val ps = getPm()?.getPackagesForUid(callingUid)
-        ps?.any { it in generatePackages }
+        ps?.any { it in generatePackages || it in hackPackages }
     }.onFailure { Logger.e("failed to get packages", it) }.getOrNull() ?: false
 }

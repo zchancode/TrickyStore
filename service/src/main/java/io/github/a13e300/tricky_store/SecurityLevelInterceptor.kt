@@ -25,10 +25,18 @@ class SecurityLevelInterceptor(
     companion object {
         private val generateKeyTransaction =
             getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey")
-        private val keys = ConcurrentHashMap<Key, Info>()
+        private val deleteKeyTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "deleteKey")
+        private val createOperationTransaction =
+            getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "createOperation")
+
+        val keys = ConcurrentHashMap<Key, Info>()
+        val keyPairs = ConcurrentHashMap<Key, Pair<KeyPair, List<Certificate>>>()
 
         fun getKeyResponse(uid: Int, alias: String): KeyEntryResponse? =
             keys[Key(uid, alias)]?.response
+        fun getKeyPairs(uid: Int, alias: String): Pair<KeyPair, List<Certificate>>? =
+            keyPairs[Key(uid, alias)]
     }
 
     data class Key(val uid: Int, val alias: String)
@@ -50,23 +58,19 @@ class SecurityLevelInterceptor(
                     data.readTypedObject(KeyDescriptor.CREATOR) ?: return@runCatching
                 val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
-                // val aFlags = data.readInt()
-                // val entropy = data.createByteArray()
-                val kgp = KeyGenParameters(params)
-                if (kgp.attestationChallenge != null) {
-                    if (attestationKeyDescriptor != null) {
-                        Logger.e("warn: attestation key not supported now")
-                    } else {
-                        val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, kgp)
-                            ?: return@runCatching
-                        val response = buildResponse(pair.second, kgp, keyDescriptor)
-                        keys[Key(callingUid, keyDescriptor.alias)] = Info(pair.first, response)
-                        val p = Parcel.obtain()
-                        p.writeNoException()
-                        p.writeTypedObject(response.metadata, 0)
-                        return OverrideReply(0, p)
-                    }
-                }
+                val aFlags = data.readInt()
+                val entropy = data.createByteArray()
+                val kgp = KeyGenParameters(params, true)
+                // Logger.e("warn: attestation key not supported now")
+                val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp)
+                    ?: return@runCatching
+                keyPairs[Key(callingUid, keyDescriptor.alias)] = Pair(pair.first, pair.second)
+                val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
+                keys[Key(callingUid, keyDescriptor.alias)] = Info(pair.first, response)
+                val p = Parcel.obtain()
+                p.writeNoException()
+                p.writeTypedObject(response.metadata, 0)
+                return OverrideReply(0, p)
             }.onFailure {
                 Logger.e("parse key gen request", it)
             }

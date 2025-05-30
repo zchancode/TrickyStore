@@ -28,22 +28,16 @@ fun getBootHashFromProp(): ByteArray? {
 fun randomBytes() = ByteArray(32).also { ThreadLocalRandom.current().nextBytes(it) }
 
 val patchLevel by lazy {
-    Build.VERSION.SECURITY_PATCH.convertPatchLevel(false)
+    "2025-02-05".convertPatchLevel(false)
 }
 
 val patchLevelLong by lazy {
-    Build.VERSION.SECURITY_PATCH.convertPatchLevel(true)
+    "2025-02-05".convertPatchLevel(true)
 }
 
 // FIXME
 val osVersion by lazy {
-    when (Build.VERSION.SDK_INT) {
-        Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> 140000
-        Build.VERSION_CODES.TIRAMISU -> 130000
-        Build.VERSION_CODES.S_V2 -> 120100
-        Build.VERSION_CODES.S -> 120000
-        else -> 0
-    }
+    150000
 }
 
 fun String.convertPatchLevel(long: Boolean) = kotlin.runCatching {
