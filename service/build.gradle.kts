@@ -4,6 +4,7 @@ import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.kotlinx.serialization)
     alias(libs.plugins.agp.app)
 }
 
@@ -23,7 +24,7 @@ fun calculateChecksum(variantLowered: String): String {
         update("$verName ($verCode-$commitHash-$variantLowered)".toByteArray(Charsets.UTF_8))
         update(verCode.toString().toByteArray(Charsets.UTF_8))
         update(author.toByteArray(Charsets.UTF_8))
-        update(description.toByteArray(Charsets.UTF_8))
+        update(description!!.toByteArray(Charsets.UTF_8))
         digest().toHexString()
     }
 }
@@ -81,6 +82,8 @@ android {
 dependencies {
     compileOnly(project(":stub"))
     compileOnly(libs.annotation)
+    implementation(libs.ktoml.core)
+    implementation(libs.ktoml.file)
     implementation(libs.bcpkix.jdk18on)
 }
 

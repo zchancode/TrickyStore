@@ -1,9 +1,16 @@
 package io.github.a13e300.tricky_store
 
 import android.content.pm.IPackageManager
+import android.os.Build
 import android.os.FileObserver
 import android.os.ServiceManager
+import com.akuleshov7.ktoml.Toml
+import com.akuleshov7.ktoml.TomlIndentation
+import com.akuleshov7.ktoml.TomlInputConfig
+import com.akuleshov7.ktoml.TomlOutputConfig
 import io.github.a13e300.tricky_store.keystore.CertHack
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import java.io.File
 
 object Config {
@@ -35,6 +42,7 @@ object Config {
     private const val CONFIG_PATH = "/data/adb/tricky_store"
     private const val TARGET_FILE = "target.txt"
     private const val KEYBOX_FILE = "keybox.xml"
+    private const val DEV_CONFIG_FILE = "devconfig.toml"
     private val root = File(CONFIG_PATH)
 
     object ConfigObserver : FileObserver(root, CLOSE_WRITE or DELETE or MOVED_FROM or MOVED_TO) {
@@ -48,6 +56,7 @@ object Config {
             when (path) {
                 TARGET_FILE -> updateTargetPackages(f)
                 KEYBOX_FILE -> updateKeyBox(f)
+                DEV_CONFIG_FILE -> parseDevConfig(f)
             }
         }
     }
@@ -66,6 +75,15 @@ object Config {
         } else {
             updateKeyBox(keybox)
         }
+
+        val fDevConfig = File(root, DEV_CONFIG_FILE)
+        if (!fDevConfig.exists()) {
+            fDevConfig.createNewFile()
+            fDevConfig.writeText(Toml.encodeToString(devConfig))
+        } else {
+            parseDevConfig(fDevConfig)
+        }
+
         ConfigObserver.startWatching()
     }
 
@@ -87,4 +105,37 @@ object Config {
         val ps = getPm()?.getPackagesForUid(callingUid)
         ps?.any { it in generatePackages || it in hackPackages }
     }.onFailure { Logger.e("failed to get packages", it) }.getOrNull() ?: false
+
+    private val toml = Toml(
+        inputConfig = TomlInputConfig(
+            ignoreUnknownNames = false,
+            allowEmptyValues = true,
+            allowNullValues = true,
+            allowEscapedQuotesInLiteralStrings = true,
+            allowEmptyToml = true,
+            ignoreDefaultValues = false,
+        ),
+        outputConfig = TomlOutputConfig(
+            indentation = TomlIndentation.FOUR_SPACES,
+        )
+    )
+
+    var devConfig = DeviceConfig()
+        private set
+
+    @Serializable
+    data class DeviceConfig(
+        val securityPatch: String = Build.VERSION.SECURITY_PATCH,
+        val osVersion: Int = Build.VERSION.SDK_INT,
+    )
+
+    fun parseDevConfig(f: File?) = runCatching {
+        f ?: return@runCatching
+        if (!f.exists()) return@runCatching
+        devConfig = toml.decodeFromString(DeviceConfig.serializer(), f.readText())
+        // in case there're new updates for device config
+        f.writeText(Toml.encodeToString(devConfig))
+    }.onFailure {
+        Logger.e("", it)
+    }
 }
