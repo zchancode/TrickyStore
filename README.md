@@ -1,6 +1,6 @@
 # Tricky Store (Fork)
 
-A trick of keystore. **Android 12 or above is required**.
+A trick of keystore. **Android 10 or above is required**.
 
 ## Feature
 
@@ -56,6 +56,17 @@ For example:
 io.github.vvb2060.keyattestation
 # use certificate generating mode for gms
 com.google.android.gms!
+```
+
+## Customize security patch level 
+
+Edit the file `/data/adb/tricky_store/devconfig.toml`.
+
+For example:
+
+```
+securityPatch = "2024-04-05"
+osVersion = 34
 ```
 
 ## TODO
