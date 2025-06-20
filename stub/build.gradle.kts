@@ -26,4 +26,5 @@ android {
 
 dependencies {
     compileOnly(libs.annotation)
+    compileOnly(libs.dev.rikka.hidden.stub)
 }

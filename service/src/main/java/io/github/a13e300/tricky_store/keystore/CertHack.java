@@ -581,7 +581,14 @@ public final class CertHack {
             var vendorPatchLevel = new DERTaggedObject(true, 718, AvendorPatchLevel);
             var bootPatchLevel = new DERTaggedObject(true, 719, AbootPatchlevel);
 
-            ASN1Encodable[] teeEnforcedEncodables;
+            var rollbackResistance = new DERTaggedObject(true, 303, ASN1Boolean.TRUE);
+
+            var AmoduleHash = new DEROctetString(UtilKt.getModuleHash());
+            var moduleHash = new DERTaggedObject(true, 724 , AmoduleHash);
+
+            var arrayList = new ArrayList<ASN1Encodable>(Arrays.asList(purpose, algorithm, keySize, digest, ecCurve,
+                    noAuthRequired, origin, rootOfTrust, osVersion, osPatchLevel, vendorPatchLevel,
+                    bootPatchLevel, moduleHash, rollbackResistance));
 
             // Support device properties attestation
             if (params.brand != null) {
@@ -590,24 +597,20 @@ public final class CertHack {
                 var Aproduct = new DEROctetString(params.product);
                 var Amanufacturer = new DEROctetString(params.manufacturer);
                 var Amodel = new DEROctetString(params.model);
+
                 var brand = new DERTaggedObject(true, 710, Abrand);
                 var device = new DERTaggedObject(true, 711, Adevice);
                 var product = new DERTaggedObject(true, 712, Aproduct);
                 var manufacturer = new DERTaggedObject(true, 716, Amanufacturer);
                 var model = new DERTaggedObject(true, 717, Amodel);
 
-                teeEnforcedEncodables = new ASN1Encodable[]{purpose, algorithm, keySize, digest, ecCurve,
-                        noAuthRequired, origin, rootOfTrust, osVersion, osPatchLevel, vendorPatchLevel,
-                        bootPatchLevel, brand, device, product, manufacturer, model};
-            } else {
-                teeEnforcedEncodables = new ASN1Encodable[]{purpose, algorithm, keySize, digest, ecCurve,
-                        noAuthRequired, origin, rootOfTrust, osVersion, osPatchLevel, vendorPatchLevel,
-                        bootPatchLevel};
+                arrayList.addAll(List.of(brand, device, product, manufacturer, model));
+                arrayList.addAll(UtilKt.getTelephonyInfos());
             }
 
             ASN1Encodable[] softwareEnforced = {applicationID, creationDateTime};
 
-            ASN1OctetString keyDescriptionOctetStr = getAsn1OctetString(teeEnforcedEncodables, softwareEnforced, params);
+            ASN1OctetString keyDescriptionOctetStr = getAsn1OctetString(arrayList.toArray(new ASN1Encodable[]{}), softwareEnforced, params);
 
             return new Extension(new ASN1ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17"), false, keyDescriptionOctetStr);
         } catch (Throwable t) {
@@ -617,10 +620,10 @@ public final class CertHack {
     }
 
     private static ASN1OctetString getAsn1OctetString(ASN1Encodable[] teeEnforcedEncodables, ASN1Encodable[] softwareEnforcedEncodables, KeyGenParameters params) throws IOException {
-        ASN1Integer attestationVersion = new ASN1Integer(100);
-        ASN1Enumerated attestationSecurityLevel = new ASN1Enumerated(1);
-        ASN1Integer keymasterVersion = new ASN1Integer(100);
-        ASN1Enumerated keymasterSecurityLevel = new ASN1Enumerated(1);
+        ASN1Integer attestationVersion = new ASN1Integer(4);
+        ASN1Enumerated attestationSecurityLevel = new ASN1Enumerated(UtilKt.getStrongBox() ? 2 : 1);
+        ASN1Integer keymasterVersion = new ASN1Integer(4);
+        ASN1Enumerated keymasterSecurityLevel = new ASN1Enumerated(UtilKt.getStrongBox() ? 2 : 1);
         ASN1OctetString attestationChallenge = new DEROctetString(params.attestationChallenge);
         ASN1OctetString uniqueId = new DEROctetString("".getBytes());
         ASN1Encodable softwareEnforced = new DERSequence(softwareEnforcedEncodables);
@@ -711,10 +714,13 @@ public final class CertHack {
         public byte[] product;
         public byte[] manufacturer;
         public byte[] model;
+        public byte[] imei1, imei2;
+        public byte[] meid;
 
         public KeyGenParameters(){}
-        public KeyGenParameters(KeyParameter[] params, boolean isAttestKey) {
+        public KeyGenParameters(KeyParameter[] params) {
             for (var kp : params) {
+                Logger.d("kp: " + kp.tag);
                 var p = kp.value;
                 switch (kp.tag) {
                     case Tag.KEY_SIZE -> keySize = p.getInteger();
@@ -731,22 +737,17 @@ public final class CertHack {
                         ecCurve = p.getEcCurve();
                         ecCurveName = getEcCurveName(ecCurve);
                     }
-                    case Tag.PURPOSE -> {
-                        if (isAttestKey) {
-                            purpose.add(7);
-                            continue;
-                        }
-                        purpose.add(p.getKeyPurpose());
-                    }
-                    case Tag.DIGEST -> {
-                        digest.add(p.getDigest());
-                    }
+                    case Tag.PURPOSE -> purpose.add(p.getKeyPurpose());
+                    case Tag.DIGEST -> digest.add(p.getDigest());
                     case Tag.ATTESTATION_CHALLENGE -> attestationChallenge = p.getBlob();
                     case Tag.ATTESTATION_ID_BRAND -> brand = p.getBlob();
                     case Tag.ATTESTATION_ID_DEVICE -> device = p.getBlob();
                     case Tag.ATTESTATION_ID_PRODUCT -> product = p.getBlob();
                     case Tag.ATTESTATION_ID_MANUFACTURER -> manufacturer = p.getBlob();
                     case Tag.ATTESTATION_ID_MODEL -> model = p.getBlob();
+                    case Tag.ATTESTATION_ID_IMEI -> imei1 = p.getBlob();
+                    case Tag.ATTESTATION_ID_SECOND_IMEI -> imei2 = p.getBlob();
+                    case Tag.ATTESTATION_ID_MEID -> meid = p.getBlob();
                 }
             }
         }

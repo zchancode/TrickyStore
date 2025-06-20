@@ -2,6 +2,7 @@ package io.github.a13e300.tricky_store
 
 import android.hardware.security.keymint.KeyParameter
 import android.hardware.security.keymint.KeyParameterValue
+import android.hardware.security.keymint.SecurityLevel
 import android.hardware.security.keymint.Tag
 import android.os.IBinder
 import android.os.Parcel
@@ -22,6 +23,10 @@ class SecurityLevelInterceptor(
     private val original: IKeystoreSecurityLevel,
     private val level: Int
 ) : BinderInterceptor() {
+
+    init {
+        strongBox = level == SecurityLevel.STRONGBOX
+    }
     companion object {
         private val generateKeyTransaction =
             getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey")
@@ -60,7 +65,7 @@ class SecurityLevelInterceptor(
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
                 val aFlags = data.readInt()
                 val entropy = data.createByteArray()
-                val kgp = KeyGenParameters(params, true)
+                val kgp = KeyGenParameters(params)
                 // Logger.e("warn: attestation key not supported now")
                 val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp)
                     ?: return@runCatching

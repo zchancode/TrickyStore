@@ -1,9 +1,19 @@
 package io.github.a13e300.tricky_store
 
 import android.content.pm.IPackageManager
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.ServiceManager
 import android.os.SystemProperties
+import android.telephony.TelephonyManager
+import org.bouncycastle.asn1.ASN1Encodable
+import org.bouncycastle.asn1.ASN1Integer
+import org.bouncycastle.asn1.DEROctetString
+import org.bouncycastle.asn1.DERSequence
+import org.bouncycastle.asn1.DERTaggedObject
+import java.security.MessageDigest
 import java.util.concurrent.ThreadLocalRandom
+
 
 fun getTransactCode(clazz: Class<*>, method: String) =
     clazz.getDeclaredField("TRANSACTION_$method").apply { isAccessible = true }
@@ -67,4 +77,44 @@ fun IPackageManager.getPackageInfoCompat(name: String, flags: Long, userId: Int)
         getPackageInfo(name, flags.toInt(), userId)
     }
 
+val apexInfos by lazy {
+    mutableListOf<Pair<String, Long>>().also { list ->
+        IPackageManager.Stub.asInterface(ServiceManager.getService("package")).run {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                getInstalledPackages(PackageManager.MATCH_APEX.toLong(), 0)
+            } else {
+                getInstalledPackages(PackageManager.MATCH_APEX, 0)
+            }.list.forEach {
+                list.add(Pair(it.packageName, it.longVersionCode))
+            }
+        }
+    }.toList()
+}
+
+val moduleHash by lazy {
+    mutableListOf<ASN1Encodable>().apply {
+        apexInfos.forEach {
+            add(DEROctetString(it.first.toByteArray()))
+            add(ASN1Integer(it.second))
+        }
+    }.toTypedArray().run {
+        DERSequence(this)
+    }.encoded.run {
+        MessageDigest.getInstance("SHA-256").also { it.update(this) }.digest()
+    }
+}
+
+@Suppress("MissingPermission")
+val telephonyInfos by lazy {
+    mutableListOf<ASN1Encodable>().apply {
+        add(DERTaggedObject(true, 714, (DEROctetString(SystemProperties.get("ro.ril.oem.imei", null)?.toByteArray()))))
+        add(DERTaggedObject(true, 715, DEROctetString(SystemProperties.get("ro.ril.oem.meid", null)?.toByteArray())))
+        add(DERTaggedObject(true, 723, DEROctetString(SystemProperties.get("ro.ril.oem.imei2", null)?.toByteArray())))
+        add(DERTaggedObject(true, 713, DEROctetString(SystemProperties.get("ro.serialno", null)?.toByteArray())))
+    }.toList()
+}
+
 fun String.trimLine() = trim().split("\n").joinToString("\n") { it.trim() }
+
+@Volatile
+var strongBox = false

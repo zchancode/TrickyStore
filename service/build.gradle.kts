@@ -82,6 +82,8 @@ android {
 dependencies {
     compileOnly(project(":stub"))
     compileOnly(libs.annotation)
+    compileOnly(libs.dev.rikka.hidden.stub)
+    implementation(kotlin("reflect"))
     implementation(libs.ktoml.core)
     implementation(libs.ktoml.file)
     implementation(libs.bcpkix.jdk18on)

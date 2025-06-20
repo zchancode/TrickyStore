@@ -29,6 +29,7 @@ fun main(args: Array<String>) {
 
 @OptIn(ExperimentalStdlibApi::class)
 fun verifySelf() {
+    if (BuildConfig.DEBUG) return
     val kv = mutableMapOf<String, String>()
     val prop = File("./module.prop")
     runCatching {
