@@ -152,8 +152,8 @@ object Keystore1Interceptor : BinderInterceptor() {
                             val callback = IKeystoreExportKeyCallback.Stub.asInterface(data.readStrongBinder())
                             val alias = data.readString()!!.split("_")[1]
                             Logger.i("exportKeyTransaction uid $callingUid alias $alias")
-                            val kp = CertHack.generateKeyPair(KeyArguments[Key(callingUid, alias)])
-                            KeyPairs[Key(callingUid, alias)] = kp
+                            val kp = CertHack.generateKeyPair(KeyArguments[Key(callingUid, alias)]!!)
+                            KeyPairs[Key(callingUid, alias)] = kp!!
 
                             val erP = Parcel.obtain()
                             erP.writeInt(KeyStore.NO_ERROR)
@@ -195,7 +195,7 @@ object Keystore1Interceptor : BinderInterceptor() {
                                 val key = Key(callingUid, alias)
                                 val ka = KeyArguments[key]!!
                                 ka.attestationChallenge = attestationChallenge
-                                val chain = CertHack.generateChain(callingUid, ka, KeyPairs[key])
+                                val chain = CertHack.generateChain(callingUid, ka, KeyPairs[key]!!)
 
                                 val kcc = KeymasterCertificateChain(chain)
                                 callback.onFinished(ksr, kcc)
@@ -234,13 +234,13 @@ object Keystore1Interceptor : BinderInterceptor() {
             val alias = data.readString() ?: ""
             var response = reply.createByteArray()
             if (alias.startsWith(Credentials.USER_CERTIFICATE)) {
-                response = CertHack.hackCertificateChainUSR(response, alias.split("_")[1], callingUid)
+                response = CertHack.hackCertificateChainUSR(response!!, alias.split("_")[1], callingUid)
                 Logger.i("hacked leaf of uid=$callingUid")
                 p.writeNoException()
                 p.writeByteArray(response)
                 return OverrideReply(0, p)
             } else if (alias.startsWith(Credentials.CA_CERTIFICATE)) {
-                response = CertHack.hackCertificateChainCA(response, alias.split("_")[1], callingUid)
+                response = CertHack.hackCertificateChainCA(response!!, alias.split("_")[1], callingUid)
                 Logger.i("hacked caList of uid=$callingUid")
                 p.writeNoException()
                 p.writeByteArray(response)

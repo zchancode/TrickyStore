@@ -15,7 +15,6 @@ val verName: String by rootProject.extra
 val commitHash: String by rootProject.extra
 val author: String by rootProject.extra
 val description: String by rootProject.extra
-val moduleDescription = description
 
 fun calculateChecksum(variantLowered: String): String {
     return MessageDigest.getInstance("SHA-256").run {
@@ -24,7 +23,7 @@ fun calculateChecksum(variantLowered: String): String {
         update("$verName ($verCode-$commitHash-$variantLowered)".toByteArray(Charsets.UTF_8))
         update(verCode.toString().toByteArray(Charsets.UTF_8))
         update(author.toByteArray(Charsets.UTF_8))
-        update(description!!.toByteArray(Charsets.UTF_8))
+        update(description.toByteArray(Charsets.UTF_8))
         digest().toHexString()
     }
 }
@@ -87,6 +86,7 @@ dependencies {
     implementation(libs.ktoml.core)
     implementation(libs.ktoml.file)
     implementation(libs.bcpkix.jdk18on)
+    implementation(libs.kotlinx.coroutines.android)
 }
 
 afterEvaluate {

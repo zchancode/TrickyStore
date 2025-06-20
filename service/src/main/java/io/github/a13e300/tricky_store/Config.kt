@@ -8,7 +8,11 @@ import com.akuleshov7.ktoml.Toml
 import com.akuleshov7.ktoml.TomlIndentation
 import com.akuleshov7.ktoml.TomlInputConfig
 import com.akuleshov7.ktoml.TomlOutputConfig
+import com.akuleshov7.ktoml.annotations.TomlComments
 import io.github.a13e300.tricky_store.keystore.CertHack
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File
@@ -77,14 +81,24 @@ object Config {
         }
 
         val fDevConfig = File(root, DEV_CONFIG_FILE)
-        if (!fDevConfig.exists()) {
-            fDevConfig.createNewFile()
-            fDevConfig.writeText(Toml.encodeToString(devConfig))
-        } else {
-            parseDevConfig(fDevConfig)
-        }
+        parseDevConfig(fDevConfig)
 
         ConfigObserver.startWatching()
+    }
+
+    private fun resetProp() = CoroutineScope(Dispatchers.IO).async {
+        runCatching {
+            val p = Runtime.getRuntime().exec(
+                arrayOf(
+                    "su", "-c", "resetprop", "ro.build.version.security_patch", devConfig.securityPatch
+                )
+            )
+            if (p.waitFor() == 0) {
+                Logger.d("resetprop security_patch from ${Build.VERSION.SECURITY_PATCH} to ${devConfig.securityPatch}")
+            }
+        }.onFailure {
+            Logger.e("", it)
+        }
     }
 
     private var iPm: IPackageManager? = null
@@ -125,16 +139,24 @@ object Config {
 
     @Serializable
     data class DeviceConfig(
-        val securityPatch: String = Build.VERSION.SECURITY_PATCH,
-        val osVersion: Int = Build.VERSION.SDK_INT,
+        @TomlComments("YYYY-MM-DD") val securityPatch: String = Build.VERSION.SECURITY_PATCH,
+        @TomlComments("SDK Version (i.e.: 35 for Android 15)") val osVersion: Int = Build.VERSION.SDK_INT,
     )
 
     fun parseDevConfig(f: File?) = runCatching {
         f ?: return@runCatching
-        if (!f.exists()) return@runCatching
-        devConfig = toml.decodeFromString(DeviceConfig.serializer(), f.readText())
-        // in case there're new updates for device config
-        f.writeText(Toml.encodeToString(devConfig))
+        // stop watching writing to prevent recursive calls
+        ConfigObserver.stopWatching()
+        if (!f.exists()) {
+            f.createNewFile()
+            f.writeText(Toml.encodeToString(devConfig))
+        } else {
+            devConfig = toml.decodeFromString(DeviceConfig.serializer(), f.readText())
+            // in case there're new updates for device config
+            f.writeText(Toml.encodeToString(devConfig))
+        }
+        resetProp()
+        ConfigObserver.startWatching()
     }.onFailure {
         Logger.e("", it)
     }
