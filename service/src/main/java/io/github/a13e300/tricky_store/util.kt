@@ -64,7 +64,7 @@ private fun getOsVersion(num: Int) = when (num) {
     else -> 150000
 }
 
-fun String.convertPatchLevel(long: Boolean) = kotlin.runCatching {
+fun String.convertPatchLevel(long: Boolean) = runCatching {
     val l = split("-")
     if (long) l[0].toInt() * 10000 + l[1].toInt() * 100 + l[2].toInt()
     else l[0].toInt() * 100 + l[1].toInt()
@@ -85,13 +85,13 @@ val apexInfos by lazy {
             } else {
                 getInstalledPackages(PackageManager.MATCH_APEX, 0)
             }.list.forEach {
-                list.add(Pair(it.packageName, it.longVersionCode))
+                list.add(it.packageName to it.longVersionCode)
             }
         }
-    }.toList()
+    }.sortedBy { it.first }.toList() // soft to ensure it complies with AOSP requirements (lexicographically)
 }
 
-val moduleHash by lazy {
+val moduleHash: ByteArray by lazy {
     mutableListOf<ASN1Encodable>().apply {
         apexInfos.forEach {
             add(DEROctetString(it.first.toByteArray()))
