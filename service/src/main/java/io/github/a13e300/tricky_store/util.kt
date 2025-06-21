@@ -115,6 +115,3 @@ val telephonyInfos by lazy {
 }
 
 fun String.trimLine() = trim().split("\n").joinToString("\n") { it.trim() }
-
-@Volatile
-var strongBox = false

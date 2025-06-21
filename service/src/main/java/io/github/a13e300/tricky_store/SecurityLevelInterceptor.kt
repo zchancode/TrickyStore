@@ -22,10 +22,6 @@ class SecurityLevelInterceptor(
     private val original: IKeystoreSecurityLevel,
     private val level: Int
 ) : BinderInterceptor() {
-
-    init {
-        strongBox = level == SecurityLevel.STRONGBOX
-    }
     companion object {
         private val generateKeyTransaction =
             getTransactCode(IKeystoreSecurityLevel.Stub::class.java, "generateKey")
