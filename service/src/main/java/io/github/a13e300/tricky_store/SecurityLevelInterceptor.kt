@@ -13,7 +13,6 @@ import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
 import io.github.a13e300.tricky_store.binder.BinderInterceptor
 import io.github.a13e300.tricky_store.keystore.CertHack
-import io.github.a13e300.tricky_store.keystore.CertHack.KeyGenParameters
 import io.github.a13e300.tricky_store.keystore.Utils
 import java.security.KeyPair
 import java.security.cert.Certificate
@@ -65,11 +64,11 @@ class SecurityLevelInterceptor(
                 val params = data.createTypedArray(KeyParameter.CREATOR)!!
                 val aFlags = data.readInt()
                 val entropy = data.createByteArray()
-                val kgp = KeyGenParameters(params)
+                val kgp = CertHack.KeyGenParameters(params)
                 // Logger.e("warn: attestation key not supported now")
                 val pair = CertHack.generateKeyPair(callingUid, keyDescriptor, attestationKeyDescriptor, kgp)
                     ?: return@runCatching
-                keyPairs[Key(callingUid, keyDescriptor.alias)] = Pair(pair.first!!, pair.second!!)
+                keyPairs[Key(callingUid, keyDescriptor.alias)] = Pair(pair.first, pair.second)
                 val response = buildResponse(pair.second, kgp, attestationKeyDescriptor ?: keyDescriptor)
                 keys[Key(callingUid, keyDescriptor.alias)] = Info(pair.first, response)
                 val p = Parcel.obtain()
@@ -85,7 +84,7 @@ class SecurityLevelInterceptor(
 
     private fun buildResponse(
         chain: List<Certificate>,
-        params: KeyGenParameters,
+        params: CertHack.KeyGenParameters,
         descriptor: KeyDescriptor
     ): KeyEntryResponse {
         val response = KeyEntryResponse()
