@@ -106,7 +106,7 @@ val moduleHash: ByteArray by lazy {
 
 @Suppress("MissingPermission")
 val telephonyInfos by lazy {
-    mutableListOf<ASN1Encodable>().apply {
+    mutableListOf<DERTaggedObject>().apply {
         add(DERTaggedObject(true, 714, (DEROctetString(SystemProperties.get("ro.ril.oem.imei", null)?.toByteArray()))))
         add(DERTaggedObject(true, 715, DEROctetString(SystemProperties.get("ro.ril.oem.meid", null)?.toByteArray())))
         add(DERTaggedObject(true, 723, DEROctetString(SystemProperties.get("ro.ril.oem.imei2", null)?.toByteArray())))

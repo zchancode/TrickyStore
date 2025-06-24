@@ -57,6 +57,7 @@ import java.security.spec.ECGenParameterSpec;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -584,7 +585,7 @@ public final class CertHack {
             var AmoduleHash = new DEROctetString(UtilKt.getModuleHash());
             var moduleHash = new DERTaggedObject(true, 724 , AmoduleHash);
 
-            var arrayList = new ArrayList<ASN1Encodable>(Arrays.asList(purpose, algorithm, keySize, digest, ecCurve,
+            var arrayList = new ArrayList<>(Arrays.asList(purpose, algorithm, keySize, digest, ecCurve,
                     noAuthRequired, origin, rootOfTrust, osVersion, osPatchLevel, vendorPatchLevel,
                     bootPatchLevel, moduleHash));
 
@@ -605,6 +606,8 @@ public final class CertHack {
                 arrayList.addAll(List.of(brand, device, product, manufacturer, model));
                 arrayList.addAll(UtilKt.getTelephonyInfos());
             }
+
+            arrayList.sort(Comparator.comparingInt(ASN1TaggedObject::getTagNo));
 
             ASN1Encodable[] softwareEnforced = {applicationID, creationDateTime};
 
