@@ -3,13 +3,26 @@ name: Build
 on:
   push:
     branches: [ "master" ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '.github/**'
+      - '!.github/workflows/**'
   pull_request:
     branches: [ "master" ]
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+      - '.github/**'
+      - '!.github/workflows/**'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
     steps:
       - name: Check out
         uses: actions/checkout@v4
@@ -53,16 +66,25 @@ jobs:
           unzip module/release/Tricky-Store-v*-debug.zip -d module-debug
 
       - name: Upload release
+        id: release
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepareArtifact.outputs.releaseName }}
           path: "./module-release/*"
 
       - name: Upload debug
+        id: debug
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.prepareArtifact.outputs.debugName }}
           path: "./module-debug/*"
+
+      - name: Attest release build provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.prepareArtifact.outputs.releaseName }}
+          subject-digest: sha256:${{ steps.release.outputs.artifact-digest }}
 
       - name: Upload release mappings
         uses: actions/upload-artifact@v4
