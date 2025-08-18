@@ -38,8 +38,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -79,13 +79,15 @@ android {
 }
 
 dependencies {
+    implementation(files("src/lib/bcpkix-jdk18on-1.79.jar"))
+    implementation(files("src/lib/bcprov-jdk18on-1.79.jar"))
+    implementation(files("src/lib/bcutil-jdk18on-1.79.jar"))
     compileOnly(project(":stub"))
     compileOnly(libs.annotation)
     compileOnly(libs.dev.rikka.hidden.stub)
     implementation(kotlin("reflect"))
     implementation(libs.ktoml.core)
     implementation(libs.ktoml.file)
-    implementation(libs.bcpkix.jdk18on)
     implementation(libs.kotlinx.coroutines.android)
 }
 

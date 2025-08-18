@@ -72,7 +72,7 @@ import javax.security.auth.x500.X500Principal;
 import io.github.a13e300.tricky_store.Config;
 import io.github.a13e300.tricky_store.Logger;
 import io.github.a13e300.tricky_store.SecurityLevelInterceptor;
-import io.github.a13e300.tricky_store.UtilKt;
+import io.github.a13e300.tricky_store.TrickyStoreUtils;
 
 public final class CertHack {
     private static final ASN1ObjectIdentifier OID = new ASN1ObjectIdentifier("1.3.6.1.4.1.11129.2.1.17");
@@ -103,13 +103,13 @@ public final class CertHack {
     }
 
     private static PEMKeyPair parseKeyPair(String key) throws Throwable {
-        try (PEMParser parser = new PEMParser(new StringReader(UtilKt.trimLine(key)))) {
+        try (PEMParser parser = new PEMParser(new StringReader(TrickyStoreUtils.trimLine(key)))) {
             return (PEMKeyPair) parser.readObject();
         }
     }
 
     private static Certificate parseCert(String cert) throws Throwable {
-        try (PemReader reader = new PemReader(new StringReader(UtilKt.trimLine(cert)))) {
+        try (PemReader reader = new PemReader(new StringReader(TrickyStoreUtils.trimLine(cert)))) {
             return certificateFactory.generateCertificate(new ByteArrayInputStream(reader.readPemObject().getContent()));
         }
     }
@@ -208,7 +208,7 @@ public final class CertHack {
             signer = new JcaContentSignerBuilder(leaf.getSigAlgName())
                     .build(k.keyPair.getPrivate());
 
-            byte[] verifiedBootKey = UtilKt.getBootKey();
+            byte[] verifiedBootKey = TrickyStoreUtils.getBootKey();
             byte[] verifiedBootHash = null;
             try {
                 if (!(rootOfTrust instanceof ASN1Sequence r)) {
@@ -221,7 +221,7 @@ public final class CertHack {
             }
 
             if (verifiedBootHash == null) {
-                verifiedBootHash = UtilKt.getBootHash();
+                verifiedBootHash = TrickyStoreUtils.getBootHash();
             }
 
             ASN1Encodable[] rootOfTrustEnc = {
@@ -317,7 +317,7 @@ public final class CertHack {
             signer = new JcaContentSignerBuilder(leaf.getSigAlgName())
                     .build(k.keyPair.getPrivate());
 
-            byte[] verifiedBootKey = UtilKt.getBootKey();
+            byte[] verifiedBootKey = TrickyStoreUtils.getBootKey();
             byte[] verifiedBootHash = null;
             try {
                 if (!(rootOfTrust instanceof ASN1Sequence r)) {
@@ -330,7 +330,7 @@ public final class CertHack {
             }
 
             if (verifiedBootHash == null) {
-                verifiedBootHash = UtilKt.getBootHash();
+                verifiedBootHash = TrickyStoreUtils.getBootHash();
             }
 
             ASN1Encodable[] rootOfTrustEnc = {
@@ -465,11 +465,11 @@ public final class CertHack {
             ).getSubject();
 
             if (attestPurpose) {
-                var info = SecurityLevelInterceptor.Companion.getKeyPairs(uid, attestKeyDescriptor.alias);
+                var info = SecurityLevelInterceptor.getKeyPairs(uid, attestKeyDescriptor.alias);
                 if (info != null) {
-                    rootKP = info.getFirst();
+                    rootKP = info.first;
                     issuer = new X509CertificateHolder(
-                            info.getSecond().get(0).getEncoded()
+                            info.second.get(0).getEncoded()
                     ).getSubject();
                 }
             }
@@ -539,8 +539,8 @@ public final class CertHack {
 
     private static Extension createExtension(KeyGenParameters params, int uid) {
         try {
-            byte[] key = UtilKt.getBootKey();
-            byte[] hash = UtilKt.getBootHash();
+            byte[] key = TrickyStoreUtils.getBootKey();
+            byte[] hash = TrickyStoreUtils.getBootHash();
 
             ASN1Encodable[] rootOfTrustEncodables = {new DEROctetString(key), ASN1Boolean.TRUE,
                     new ASN1Enumerated(0), new DEROctetString(hash)};
@@ -557,12 +557,12 @@ public final class CertHack {
             var AnoAuthRequired = DERNull.INSTANCE;
 
             // To be loaded
-            var AosVersion = new ASN1Integer(UtilKt.getOsVersion());
-            var AosPatchLevel = new ASN1Integer(UtilKt.getPatchLevel());
+            var AosVersion = new ASN1Integer(TrickyStoreUtils.getOsVersion());
+            var AosPatchLevel = new ASN1Integer(TrickyStoreUtils.getPatchLevel());
 
             var AapplicationID = createApplicationId(uid);
-            var AbootPatchlevel = new ASN1Integer(UtilKt.getPatchLevelLong());
-            var AvendorPatchLevel = new ASN1Integer(UtilKt.getPatchLevelLong());
+            var AbootPatchlevel = new ASN1Integer(TrickyStoreUtils.getPatchLevelLong());
+            var AvendorPatchLevel = new ASN1Integer(TrickyStoreUtils.getPatchLevelLong());
 
             var AcreationDateTime = new ASN1Integer(System.currentTimeMillis());
             var Aorigin = new ASN1Integer(0);
@@ -582,7 +582,7 @@ public final class CertHack {
             var vendorPatchLevel = new DERTaggedObject(true, 718, AvendorPatchLevel);
             var bootPatchLevel = new DERTaggedObject(true, 719, AbootPatchlevel);
 
-            var AmoduleHash = new DEROctetString(UtilKt.getModuleHash());
+            var AmoduleHash = new DEROctetString(TrickyStoreUtils.getModuleHash());
             var moduleHash = new DERTaggedObject(true, 724 , AmoduleHash);
 
             var arrayList = new ArrayList<>(Arrays.asList(purpose, algorithm, keySize, digest, ecCurve,
@@ -591,7 +591,7 @@ public final class CertHack {
 
             // Support device properties attestation
             if (params.brand != null) {
-                arrayList.addAll(UtilKt.getTelephonyInfos());
+                arrayList.addAll(TrickyStoreUtils.getTelephonyInfos());
             }
 
             arrayList.sort(Comparator.comparingInt(ASN1TaggedObject::getTagNo));
@@ -626,7 +626,7 @@ public final class CertHack {
     }
 
     private static DEROctetString createApplicationId(int uid) throws Throwable {
-        var pm = Config.INSTANCE.getPm();
+        var pm = Config.getPm();
         if (pm == null) {
             throw new IllegalStateException("createApplicationId: pm not found!");
         }
@@ -637,7 +637,7 @@ public final class CertHack {
         var dg = MessageDigest.getInstance("SHA-256");
         for (int i = 0; i < size; i++) {
             var name = packages[i];
-            var info = UtilKt.getPackageInfoCompat(pm, name, PackageManager.GET_SIGNATURES, uid / 100000);
+            var info = TrickyStoreUtils.getPackageInfoCompat(pm, name, PackageManager.GET_SIGNATURES, uid / 100000);
             ASN1Encodable[] arr = new ASN1Encodable[2];
             arr[ATTESTATION_PACKAGE_INFO_PACKAGE_NAME_INDEX] =
                     new DEROctetString(packages[i].getBytes(StandardCharsets.UTF_8));
