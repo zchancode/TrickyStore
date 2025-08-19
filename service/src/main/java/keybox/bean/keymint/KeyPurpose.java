@@ -1,4 +1,4 @@
-package android.hardware.security.keymint;
+package keybox.bean.keymint;
 
 public @interface KeyPurpose {
     int AGREE_KEY = 6;

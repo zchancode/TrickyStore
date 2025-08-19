@@ -1,26 +1,28 @@
 package io.github.a13e300.tricky_store
 
 import android.os.Build
+import keybox.KeystoreInterceptor
+import keybox.Logger
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
-    try {
-        Class.forName("org.bouncycastle.asn1.misc.MiscObjectIdentifiers")
-        Class.forName("org.bouncycastle.operator.jcajce.JcaContentSignerBuilder")
-    } catch (e: ClassNotFoundException) {
-        Logger.i("Bouncy Castle classes not found, please ensure Bouncy Castle is included in the classpath.")
+    val interceptor = KeystoreInterceptor()
+    var res = interceptor.inject()
+    if (!res) {
+        Logger.i("Failed to inject KeystoreInterceptor, exiting...")
+        exitProcess(0)
+    }
+    res = interceptor.readKeyBox()
+    if (!res) {
+        Logger.i("Failed to read KeyBox, exiting...")
+        exitProcess(0)
     }
 
-    Logger.i("Welcome to TrickyStore!")
+    Logger.i("KeyBox read successfully, starting app...")
+
+
+
     while (true) {
-        if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q || Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
-            if (!KeystoreInterceptor().tryRunKeystoreInterceptor()) {
-                Thread.sleep(1000)
-                continue
-            }
-        }
-        Config.initialize()
-        while (true) {
-            Thread.sleep(1000000)
-        }
+        Thread.sleep(1000000)
     }
 }

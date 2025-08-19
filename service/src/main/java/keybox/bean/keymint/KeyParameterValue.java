@@ -1,9 +1,8 @@
-package android.hardware.security.keymint;
+package keybox.bean.keymint;
 
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import androidx.annotation.NonNull;
 
 /* loaded from: classes2.dex */
 public final class KeyParameterValue implements Parcelable {
@@ -233,7 +232,7 @@ public final class KeyParameterValue implements Parcelable {
     }
 
     @Override
-    public void writeToParcel(@NonNull Parcel parcel, int i) {
+    public void writeToParcel(Parcel parcel, int i) {
         throw new RuntimeException();
     }
 }

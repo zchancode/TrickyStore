@@ -1,4 +1,5 @@
-package io.github.a13e300.tricky_store;
+package keybox;
+
 
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageInfo;
@@ -6,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.ServiceManager;
 import android.os.SystemProperties;
+import android.util.Log;
 import android.util.Pair;
 
 import org.bouncycastle.asn1.ASN1Encodable;
@@ -14,10 +16,11 @@ import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.DERSequence;
 import org.bouncycastle.asn1.DERTaggedObject;
 
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -53,6 +56,31 @@ public class TrickyStoreUtils {
             bootKey = randomBytes();
         }
         return bootKey;
+    }
+
+    public static byte[] toBytes(Collection<Certificate> certificates) {
+        try {
+            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+            for (Certificate cert : certificates) {
+                byteArrayOutputStream.write(cert.getEncoded());
+            }
+            return byteArrayOutputStream.toByteArray();
+        } catch (Exception e) {
+            Log.w("Couldn't getBytes certificates in keystore", e);
+            return null;
+        }
+    }
+    public static List<byte[]> toListBytes(Collection<Certificate> certificates) {
+        try {
+            List<byte[]> chain = new ArrayList<>();
+            for (Certificate cert : certificates) {
+                chain.add(cert.getEncoded());
+            }
+            return chain;
+        } catch (Exception e) {
+            Log.w("Couldn't toListBytes certificates in keystore", e);
+            return null;
+        }
     }
 
     public static byte[] getBootHashFromProp() {
@@ -106,10 +134,15 @@ public class TrickyStoreUtils {
     }
 
     public static PackageInfo getPackageInfoCompat(IPackageManager pm, String name, long flags, int userId) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return pm.getPackageInfo(name, flags, userId);
-        } else {
-            return pm.getPackageInfo(name, (int) flags, userId);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                return pm.getPackageInfo(name, flags, userId);
+            } else {
+                return pm.getPackageInfo(name, (int) flags, userId);
+            }
+        }catch (Exception e) {
+            Logger.e("Failed to get package info for " + name, e);
+            return null;
         }
     }
 

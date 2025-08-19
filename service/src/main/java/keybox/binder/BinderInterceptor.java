@@ -1,11 +1,12 @@
-package io.github.a13e300.tricky_store.binder;
+package keybox.binder;
 
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.RemoteException;
 
-import io.github.a13e300.tricky_store.Logger;
+import keybox.Logger;
+
 
 public class BinderInterceptor extends Binder {
 

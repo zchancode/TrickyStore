@@ -1,4 +1,4 @@
-package android.hardware.security.keymint;
+package keybox.bean.keymint;
 public @interface Tag {
     int INVALID = 0;
     int PURPOSE = 536870913;

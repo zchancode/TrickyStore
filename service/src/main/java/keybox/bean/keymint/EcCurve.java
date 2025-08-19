@@ -1,4 +1,4 @@
-package android.hardware.security.keymint;
+package keybox.bean.keymint;
 
 /* loaded from: classes2.dex */
 public @interface EcCurve {
