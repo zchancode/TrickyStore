@@ -5,7 +5,7 @@ import android.os.Parcelable;
 
 
 public class KeyParameter implements Parcelable {
-    public static final Creator<KeyParameter> CREATOR = new Creator<>() {
+    public static final Creator<KeyParameter> CREATOR = new Creator<KeyParameter>() {
         @Override
         public KeyParameter createFromParcel(Parcel in) {
             throw new RuntimeException();

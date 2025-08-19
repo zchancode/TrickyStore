@@ -21,6 +21,7 @@ import android.security.keystore.IKeystoreExportKeyCallback;
 import android.security.keystore.IKeystoreKeyCharacteristicsCallback;
 import android.security.keystore.IKeystoreService;
 import android.security.keystore.KeystoreResponse;
+import android.util.Log;
 
 import java.io.File;
 import java.io.IOException;
@@ -199,7 +200,9 @@ public class KeystoreInterceptor extends BinderInterceptor {
                     String alias = data.readString().split("_")[1];
                     Logger.i("attestKeyTransaction uid " + callingUid + " alias " + alias);
                     int check = data.readInt();
+                    Logger.i("attestKeyTransaction check " + check);
                     KeymasterArguments kma = new KeymasterArguments();
+                    Logger.i("attestKeyTransaction check " + check);
                     if (check == 1) {
                         kma.readFromParcel(data);
                         byte[] attestationChallenge = kma.getBytes(KeymasterDefs.KM_TAG_ATTESTATION_CHALLENGE, new byte[0]);
@@ -215,19 +218,19 @@ public class KeystoreInterceptor extends BinderInterceptor {
                         KeyGenParameters ka = KeyArguments.get(key);
                         ka.attestationChallenge = attestationChallenge;
                         KeyPair kp = KeyPairs.get(key);
+                        Logger.i("ka:" + ka + " kp:" + kp.getPublic() + "kp:" + kp.getPrivate());
                         List<byte[]> chain = PreDecoder.generateChain(keyboxs, callingUid, ka, kp);
-
                         KeymasterCertificateChain kcc = new KeymasterCertificateChain(chain);
                         callback.onFinished(ksr, kcc);
                     }
-
                     Parcel p = Parcel.obtain();
                     p.writeNoException();
                     p.writeInt(KeyStore.NO_ERROR);
                     return new OverrideReply(0, p);
                 }
             }
-        } catch (Throwable ignored) {
+        } catch (Throwable th) {
+            Logger.i("拦截失败" + th);
         }
         return Skip.INSTANCE;
     }

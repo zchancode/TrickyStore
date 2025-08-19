@@ -110,12 +110,12 @@ public class TrickyStoreUtils {
     }
 
     private static int getOsVersion(int num) {
-        if (num == Build.VERSION_CODES.VANILLA_ICE_CREAM) return 150000;
-        if (num == Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return 140000;
-        if (num == Build.VERSION_CODES.TIRAMISU) return 130000;
-        if (num == Build.VERSION_CODES.S_V2) return 120100;
-        if (num == Build.VERSION_CODES.S) return 120000;
-        if (num == Build.VERSION_CODES.Q) return 110000;
+        if (num == 34) return 150000;
+        if (num == 33) return 140000;
+        if (num == 32) return 130000;
+        if (num == 31) return 120100;
+        if (num == 30) return 120000;
+        if (num == 29) return 110000;
         return 150000;
     }
 
@@ -135,11 +135,7 @@ public class TrickyStoreUtils {
 
     public static PackageInfo getPackageInfoCompat(IPackageManager pm, String name, long flags, int userId) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                return pm.getPackageInfo(name, flags, userId);
-            } else {
-                return pm.getPackageInfo(name, (int) flags, userId);
-            }
+            return pm.getPackageInfo(name, (int) flags, userId);
         }catch (Exception e) {
             Logger.e("Failed to get package info for " + name, e);
             return null;
@@ -152,12 +148,7 @@ public class TrickyStoreUtils {
             IPackageManager pm = IPackageManager.Stub.asInterface(ServiceManager.getService("package"));
             try {
                 List<?> packages;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    packages = pm.getInstalledPackages((long) PackageManager.MATCH_APEX, 0).getList();
-                } else {
-                    packages = pm.getInstalledPackages(PackageManager.MATCH_APEX, 0).getList();
-                }
-                
+                packages = pm.getInstalledPackages(PackageManager.MATCH_APEX, 0).getList();
                 for (Object pkg : packages) {
                     // Assuming PackageInfo has packageName and longVersionCode fields
                     // You'll need to adjust this based on your actual PackageInfo class
@@ -168,7 +159,7 @@ public class TrickyStoreUtils {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            
+
             // Sort lexicographically
             apexInfos.sort((o1, o2) -> o1.first.compareTo(o2.first));
         }
@@ -182,7 +173,7 @@ public class TrickyStoreUtils {
                 list.add(new DEROctetString(apexInfo.first.getBytes()));
                 list.add(new ASN1Integer(apexInfo.second));
             }
-            
+
             try {
                 DERSequence sequence = new DERSequence(list.toArray(new ASN1Encodable[0]));
                 MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -198,23 +189,23 @@ public class TrickyStoreUtils {
     public static synchronized List<DERTaggedObject> getTelephonyInfos() {
         if (telephonyInfos == null) {
             telephonyInfos = new ArrayList<>();
-            
+
             String brand = Build.BRAND;
             String device = Build.DEVICE;
             String product = Build.PRODUCT;
             String manufacturer = Build.MANUFACTURER;
             String model = Build.MODEL;
             String serial = SystemProperties.get("ro.serialno", "");
-            
+
             String meid = SystemProperties.get("ro.ril.oem.imei", "");
             String imei = SystemProperties.get("ro.ril.oem.meid", "");
             String imei2 = SystemProperties.get("ro.ril.oem.imei2", "");
-            
+
             telephonyInfos.add(toTaggedObj(toDER(imei), 714));
             telephonyInfos.add(toTaggedObj(toDER(meid), 715));
             telephonyInfos.add(toTaggedObj(toDER(imei2), 723));
             telephonyInfos.add(toTaggedObj(toDER(serial), 713));
-            
+
             telephonyInfos.add(toTaggedObj(toDER(brand), 710));
             telephonyInfos.add(toTaggedObj(toDER(device), 711));
             telephonyInfos.add(toTaggedObj(toDER(product), 712));

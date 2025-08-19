@@ -50,4 +50,21 @@ public class KeyGenParameters {
                     break;
             }
         }
+
+    @Override
+    public String toString() {
+        return "KeyGenParameters{" +
+                "keySize=" + keySize +
+                ", algorithm=" + algorithm +
+                ", certificateSerial=" + certificateSerial +
+                ", certificateNotBefore=" + certificateNotBefore +
+                ", certificateNotAfter=" + certificateNotAfter +
+                ", certificateSubject=" + certificateSubject +
+                ", rsaPublicExponent=" + rsaPublicExponent +
+                ", ecCurve=" + ecCurve +
+                ", ecCurveName='" + ecCurveName + '\'' +
+                ", purpose=" + purpose +
+                ", digest=" + digest +
+                '}';
     }
+}
